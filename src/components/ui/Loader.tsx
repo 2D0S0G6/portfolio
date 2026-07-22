@@ -17,8 +17,10 @@ export function Loader() {
   const [phase, setPhase] = useState<'visible' | 'fading' | 'done'>('visible');
 
   useEffect(() => {
-    const fadeTimer = setTimeout(() => setPhase('fading'), 1500);
-    const hideTimer = setTimeout(() => setPhase('done'), 2150);
+    // Kept short on purpose: this overlay covers the LCP element, so every
+    // millisecond here is added directly to Largest Contentful Paint.
+    const fadeTimer = setTimeout(() => setPhase('fading'), 350);
+    const hideTimer = setTimeout(() => setPhase('done'), 800);
     return () => {
       clearTimeout(fadeTimer);
       clearTimeout(hideTimer);
