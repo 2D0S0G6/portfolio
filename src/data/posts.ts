@@ -1,91 +1,145 @@
 import type { Post } from '@/types';
 
-/** Newest first — the Writing index renders these in array order. */
-export const posts: readonly Post[] = [
+/**
+ * Newest first — the Writing index renders these in array order.
+ *
+ * Findings are described at the level already public in the 0din disclosures:
+ * IDs, titles and the framing each tactic used — never the payloads themselves.
+ */
+const featuredPosts: readonly Post[] = [
   {
-    id: 'quiet-parts',
-    title: 'On the quiet parts of security research',
-    date: '2026-06-30',
-    read: '6 min',
-    tags: ['research', 'craft'],
+    id: 'trustmqtt-continuous-identity',
+    title: 'The connection was authenticated. The device was not.',
+    date: '2026-07-22',
+    read: '11 min',
+    tags: ['iot-security', 'mqtt', 'authentication', 'research'],
     excerpt:
-      'The best findings rarely come from noise. A note on patience, note-taking, and sitting with a system until it tells you something.',
+      'MQTT checks who you are once, at connect time, and then never asks again. Notes on TrustMQTT, built during my internship at the Amrita Center for Cybersecurity Systems & Networks.',
     body: [
-      "Most of the security work that actually matters is slow. It doesn't look like the movies — it looks like reading the same log twice, writing down a hunch, and coming back to it the next morning.",
-      "I've learned to trust the boring parts. The finding that changes an assessment usually arrives after an hour of doing nothing flashy: renaming variables, drawing the data flow on paper, sitting with a system until it stops feeling foreign.",
-      'So this is a small argument for patience. Take the note. Sleep on it. The quiet parts are where the good work hides.',
+      'MQTT asks a device to prove who it is exactly once — in the CONNECT packet, at the very start of the session — and then never asks again. Everything after that is trusted on the strength of a handshake that may have happened months ago.',
+      'For a web session that is mostly fine, because sessions are short and re-authentication is cheap. For an industrial sensor that opens a connection in March and is still holding it in September, it is a much stranger proposition. TrustMQTT is our attempt to make that ongoing relationship verifiable rather than assumed.',
+      'It is a two-person project, built during my internship at the Amrita Center for Cybersecurity Systems & Networks. Richu James wrote the foundation — the Mosquitto broker plugin, the scoring worker, and the traffic simulator. My side has been the behavioural-identity design and the hybrid detection architecture, modelling the attack scenarios we evaluate against, and the hardening, CI and audit work that moved it from a prototype toward something that can be run repeatedly and trusted. Credit where it is due, and the split is documented in the repository.',
+      'Some background, in case you have not had reason to care about MQTT. It is a publish/subscribe protocol built for constrained devices and unreliable links: clients connect to a broker, publish to topics, subscribe to topics, and the broker fans messages out. It is deliberately, aggressively lightweight — a two-byte fixed header, minimal handshaking — which is exactly why it ended up underneath so much of the industrial and consumer IoT world.',
+      'Authentication in that world is usually a username and password in the CONNECT packet, or a TLS client certificate, backed by an access control list that says which client may publish or subscribe to which topics. All of it is evaluated at connection time. The ACL keeps enforcing itself on every message, but the question of whether the entity on the other end is still the device that authenticated is never revisited.',
+      'That gap matters more in IoT than almost anywhere else, because of how these credentials live in the world. They are frequently baked into firmware, which means anyone who can pull a flash chip can read them. They are frequently shared across an entire fleet, because provisioning unique secrets to fifty thousand devices is genuinely hard. And the devices themselves are often physically reachable — mounted on a wall, sitting in a field, bolted to a machine in a warehouse. The threat model is not a distant attacker guessing passwords. It is someone with a screwdriver.',
+      'Once an attacker has those credentials, the protocol has nothing further to say. They connect, they pass the ACL, and they look exactly like the device they are impersonating — indefinitely, because nothing in MQTT will ever ask a second time.',
+      'The idea behind continuous authentication is to stop treating identity as an event and start treating it as a state that decays. Rather than one check at the door, you keep asking a quieter question throughout the session: does this client still behave like the client that connected?',
+      'What makes this more tractable on IoT than on humans is that devices are creatures of habit to a degree people never are. A temperature sensor publishes to the same topics, on close to the same cadence, with payloads of nearly the same size, at the same QoS. Human behavioural biometrics have to contend with mood, fatigue and context. A sensor has none of those. Its normal is narrow, and that narrowness is the signal.',
+      'The constraint that shaped everything is that you cannot push new cryptography to devices already deployed in the field. Whatever the scheme is, it has to work with the traffic those devices already emit, which means observation happens at the broker and the device stays untouched.',
+      'So the plugin lives inside Mosquitto, in C, and its single most important property is that it never blocks. Packet metadata is pushed onto a lock-free ring buffer and drained by a separate emitter into Redis; the broker hands off and moves on. Nothing on the message path waits for a model to make up its mind. A security control that adds latency to every publish is a security control that gets removed the first time it shows up in a latency graph.',
+      'A Python worker drains the queue and does the actual thinking. It accumulates events into tumbling per-client windows and reduces each window to a feature vector: message rate, unique topic count, the ratio of topics never seen before, topic entropy, payload size statistics, retained-message ratio, subscription count delta. A baseline is the median and interquartile range of each feature over that client’s history — deliberately robust statistics, because a single strange window should not move the reference.',
+      'Features alone were not enough, though, because they discard order. A device that publishes to the same three topics in the same rotation has a structure that a per-window average erases completely. So each client also carries a Markov model over topic-class transitions: which topic tends to follow which. Topics get normalised into classes first, so that "plant-a/line2/temp" and "plant-a/line7/temp" collapse to the same shape and the model generalises across a fleet instead of memorising individual device names.',
+      'That gives you two useful questions instead of one. Is this client’s current behaviour statistically unusual for it — and is it making transitions it has essentially never made before? We score the second with the probability of the observed transition, compare distributions across days with Jensen–Shannon divergence, and track how stable a fingerprint has been over time. A device whose model has settled is one you can trust conclusions about; a device still learning is one you should be careful with.',
+      'The response is graded rather than binary, which was a design decision I pushed for early. False positives are not free here. If a behavioural check disconnects a legitimate sensor because a firmware update shifted its publish rate, you have built a system that trades outages for security, and operations will switch it off — correctly. So a verdict escalates through levels: normal, then throttled once trust drops past one threshold, then quarantined past another. Throttling is a token bucket enforced in the C plugin against a cached verdict, so enforcement is local and immediate even though the decision was made asynchronously somewhere else.',
+      'The other piece I argued for is the hybrid split between the model that decides and the model that explains. An isolation forest is good at flagging that a feature vector is an outlier and completely useless at telling an analyst why they should care. So the numerical model owns the verdict, and a language model is handed the evidence — the features that moved, the transitions that were novel — and asked to write the human-readable account. It never gets a vote. Letting an LLM decide security outcomes would reintroduce every problem I spend the rest of my time writing about; letting it narrate a decision something rigorous already made is genuinely useful.',
+      'The scenarios we evaluate against are the part I own most directly, and designing them taught me more than anything else. Credential-reuse hijack: a client keeps entirely valid credentials but begins publishing to a topic it has never touched. Topic-scope expansion: a compromised device probes across the broker’s topic space far faster than its baseline, which is reconnaissance wearing the device’s own identity.',
+      'Slow-rate escalation is the one that best captures why any of this is necessary. A device ramps its publish rate gradually across ten minutes, staying underneath whatever static rate limit the ACL enforces at every instant, while drifting far away from what it normally does. A threshold cannot see it. Only a baseline can.',
+      'And coordinated drift is the scenario that broke my assumptions. A third of the fleet shifts its payload sizes together, in the same window — a botnet-style compromise. Per-client scoring is nearly blind to it, because every client is being compared against its own recent history, and that history is moving too. Everyone looks locally fine while the fleet as a whole walks somewhere new. Catching it requires a baseline at the fleet level asking a different question entirely: not "is this device behaving oddly" but "are too many devices changing in the same direction at once".',
+      'Now the honest part. Benchmarking is Phase 2 and Phase 2 has not happened. I have no detection rates to show you, no false-positive numbers, no measured plugin overhead. The scenarios exist and the pipeline runs end to end; what does not yet exist is the careful evaluation that would let me claim any of it works. I would rather say that plainly than dress up a prototype as a result, and when those numbers exist I will write them up whichever way they come out.',
+      'The related open problem is baseline drift. Devices legitimately change — firmware updates, seasonal duty cycles, network conditions. A model that treats its first week of observation as eternal truth slowly becomes an alarm generator. Distinguishing benign adaptation from an intruder patiently settling in is, as far as I can tell, the actual research question rather than a parameter to tune later.',
+      'What this internship has mostly taught me is how much of IoT security is negotiating with constraints you do not control. You cannot change the protocol, you cannot touch the firmware, you cannot add a second factor to a device with no screen, and you cannot afford to be wrong often enough to be annoying. The interesting work is whatever survives all of that being subtracted.',
+      'If you run MQTT at any real scale, I would genuinely like to know which of these assumptions do not survive contact with your fleet.',
     ],
   },
   {
-    id: 'teaching-refuse',
-    title: 'Teaching a model to refuse',
-    date: '2026-06-05',
-    read: '9 min',
-    tags: ['ai-safety', 'llm'],
+    id: 'five-guardrail-jailbreaks',
+    title: 'Five guardrail jailbreaks, eighty-four tries',
+    date: '2026-07-12',
+    read: '10 min',
+    tags: ['jailbreaks', 'prompt-injection', 'llm-security', '0din'],
     excerpt:
-      'Guardrails are not a feature you bolt on at the end. What red-teaming my own models taught me about designing refusal.',
+      'A 6% hit rate on a GenAI bug bounty. All five of my validated findings turned out to be the same idea wearing different clothes — and that was the actual result.',
     body: [
-      "Refusal is a design problem, not a filter you staple on at the end. If you wait until the model is built to decide what it should decline, you'll always be a step behind the people probing it.",
-      'When I red-team my own models, the interesting failures are rarely the obvious ones. They come from indirection — a request wrapped in a request, an instruction hidden in data the model was only meant to read.',
-      'The fix that holds up is boring and structural: separate instructions from content, make tool use explicit, and log every decision so you can watch refusal working — or not.',
-    ],
-  },
-  {
-    id: 'foggy-ctf',
-    title: 'Notes from a foggy CTF weekend',
-    date: '2026-05-18',
-    read: '5 min',
-    tags: ['ctf', 'writeup'],
-    excerpt:
-      'Two days, three time zones, one very stubborn reversing challenge. What stuck with me afterward.',
-    body: [
-      "Two days, three time zones, and one reversing challenge that refused to fall. That's the short version of last weekend's CTF.",
-      "The breakthrough came where it usually does — after I stopped brute-forcing and started reading. The binary wasn't hiding a trick so much as a small, honest state machine I'd been too impatient to map.",
-      "We didn't win, but I came away with a cleaner mental model and a page of notes I'll use for years. That's a fair trade.",
-    ],
-  },
-  {
-    id: 'shape-exploit',
-    title: 'The shape of a good exploit',
-    date: '2026-04-27',
-    read: '7 min',
-    tags: ['security', 'craft'],
-    excerpt:
-      'A good exploit is small, honest, and reproducible. On writing proofs-of-concept that other people can trust.',
-    body: [
-      'A good exploit is small. It does one thing, it does it reliably, and someone else can run it without a five-paragraph apology attached.',
-      "I try to write proofs-of-concept the way I'd want to receive them: minimal setup, clear preconditions, and output that makes the impact obvious. If a defender can't reproduce it, it isn't finished.",
-      'Honesty matters here too. Note the caveats, the version numbers, the things that might not generalize. The credibility of the finding rests on it.',
-    ],
-  },
-  {
-    id: 'write-everything',
-    title: 'Why I write everything down',
-    date: '2026-03-30',
-    read: '4 min',
-    tags: ['craft', 'notes'],
-    excerpt: 'My lab notebook has saved me more times than any tool. A short case for writing as thinking.',
-    body: [
-      'My lab notebook has bailed me out more often than any tool. Half of security research is remembering what you already tried.',
-      'Writing is how I think. The act of explaining a bug to an imaginary reader forces the gaps in my understanding to the surface, usually before they cost me an afternoon.',
-      'So I write everything down — dead ends included. The dead ends are often the most useful thing I have three months later.',
-    ],
-  },
-  {
-    id: 'reversing-reading',
-    title: 'Reverse engineering as reading',
-    date: '2026-02-19',
-    read: '8 min',
-    tags: ['reversing', 'learning'],
-    excerpt:
-      'Disassembly is just a language you have not learned to read yet. How I approach an unfamiliar binary.',
-    body: [
-      "Disassembly looks intimidating until you realize it's just a language you haven't learned to read yet. Like any language, fluency comes from volume, not talent.",
-      "When I open an unfamiliar binary I don't start at the entry point. I look for the strings, the imports, the shape of the thing — the way you'd skim a book before reading it.",
-      "From there it's iterative: name what you understand, guess at what you don't, and let the picture resolve. Reversing is reading, slowly, with a pencil in hand.",
+      'Eighty-four submissions. Five validated. That is a six percent hit rate, and for a long time I found the number embarrassing enough not to say out loud.',
+      'I have come around on it. The seventy-nine rejections are where I actually learned to do this work, and almost none of what they taught me shows up in the write-ups people publish. So this is the honest version: what prompt injection really is, why the guardrail sitting in front of a model rarely saves it, and what the five findings that landed had in common.',
+      'Start with the thing that makes this class of bug so stubborn. A language model receives one undifferentiated stream of text. Your system prompt, the user message, the contents of a document it was asked to summarise, the output of a tool it just called — by the time the model sees any of it, all of that has been flattened into the same context, in the same format, carrying the same authority. The model has no reliable way to tell you what came from the developer and what came from a stranger.',
+      'People reach for the SQL injection analogy here, and it is a decent starting point, but it flatters our situation. SQL injection was solved by parameterised queries: a mechanism that puts code and data in genuinely separate channels, so a value can never be reinterpreted as an instruction. There is no equivalent for natural language. The instruction and the data are made of the same substance. We ask the model, politely, to keep them apart, and it usually does, and then sometimes it does not.',
+      'The direct version is the one everyone has seen: a user types something adversarial straight into the box. The indirect version is where the real damage lives — the attacker never talks to the model at all. They leave the payload somewhere the model will eventually read, and the instructions arrive wearing the costume of data. Every retrieval and every tool call is another mouth through which untrusted text can enter the context.',
+      'So teams add a guardrail. Usually that means a classifier — sometimes a fine-tuned smaller model, sometimes the same model wearing a different system prompt — that inspects input, output, or both, and blocks what looks like an attack.',
+      'Here is the structural problem: the guardrail is a language model reading attacker-controlled text. It inherits every weakness of the thing it is protecting. You have not built a boundary. You have added a second model that can also be talked out of its instructions, and given yourself the comfortable feeling that a boundary exists.',
+      'Guardrails also tend to classify surface form rather than intent. They are trained on a distribution of known attacks, which means they are excellent at recognising what an attack looked like last year. That is the seam all five of my validated findings went through, and once I saw the shape of it I stopped looking for anything else.',
+      'The first to validate was 0x9DFBF7C5, filed as a multiple-model guardrail jailbreak via a "Linked List vs Graph Efficiency" tactic. The frame is an undergraduate data-structures question: compare two representations, discuss traversal cost, justify the trade-off. Nothing about that request trips a safety classifier, because on the surface it is the most benign thing a model gets asked all day. The restricted material rides in as the subject matter being compared rather than as the thing being requested.',
+      '0x9754FA8D used the same shape in a different costume: the fractional knapsack problem, a greedy-optimisation exercise every algorithms course covers. Posing a request as constrained optimisation invites the model into a solver posture. It is weighing items against a capacity limit and reporting an optimum, and the guardrail sees arithmetic where it should be seeing intent.',
+      '0xFE812EB5 left computer science entirely and went to "Judicial Research". Legal work carries a built-in licence to discuss things that are otherwise off-limits — precedent, statute, the specifics of what was actually done in a case. Models are trained to accommodate that licence, because a model that refused to engage with law would be useless to a large and entirely legitimate class of user. The frame does not merely evade the guardrail. It supplies the guardrail with a reason to stand down.',
+      '0x4E50F2C9, "Academic Table Analysis", was the one that changed how I think about output format. Asking a model to complete or analyse a structured table is not asking it to write prose, and a great deal of safety behaviour is tuned on prose. A table reads as data processing. The cells arrive one at a time, each individually unremarkable, and the refusal heuristics that would have fired on a paragraph never quite engage.',
+      '0x4245FF1F closed the set with a "Scholarly Analysis Framework" tactic, the most general of the five and the most honest about what the whole family is doing. Rather than borrowing one discipline\'s vocabulary, it borrows the posture of scholarship itself: establish a framework, define the criteria, analyse the subject against them. Academic structure turns out to be a strong enough signal of legitimacy on its own that the content it organises receives far less scrutiny than it should.',
+      'All five are the same idea wearing different clothes, and that similarity is the actual result. None of them is a clever string. Each dresses a request in the vocabulary of legitimate technical or scholarly work, and the guardrail — reading for the shape of an attack — classifies the costume instead of the body underneath.',
+      'The "multiple model" in those titles matters too. These were not quirks of one vendor\'s tuning. They generalised, because every major lab has the same incentive to be maximally accommodating toward homework, optimisation problems, legal research and structured data. That accommodation is load-bearing; you cannot simply train it away without breaking the product. Which is why I think this family is harder to fix than a filter update, and why I expect variants of it to keep working for a while.',
+      'I am describing frames here and not payloads. The tactics are already public in the 0din disclosures; the specific strings that made them fire are not, and a blog post is not the place to hand those over.',
+      'So what separated those five from the seventy-nine? Almost never cleverness. The rejections were mostly one of three things: a jailbreak that produced output which was edgy but not actually harmful, a bug I could trigger once but not explain, or a real behaviour with no plausible path to impact on anyone. Novelty on its own is not a vulnerability. Neither is a model saying something you were not supposed to be able to make it say, if nothing follows from it.',
+      'Reproducibility did more work than anything else. A finding that fires reliably, with the preconditions written down and the failure mode described in a sentence, gets triaged quickly. A finding that worked on Tuesday and cannot be made to work again is not a finding, however good the screenshot was. I lost more submissions to sloppy note-taking than to bad ideas.',
+      'If you are starting out, the advice that would have saved me the most time is this: stop hunting for the sentence that unlocks the model, and start collecting frames that make a refusal feel unreasonable. The guardrail is not really asking whether a request is dangerous. It is asking whether the request looks like the kind of thing a legitimate user would send — and that is a much softer question than it sounds.',
+      'And expect the hit rate. Six percent looked like failure until I understood that the eighty-four attempts were the method, not the overhead.',
     ],
   },
 ];
+
+const paperPosts: readonly Post[] = [
+  {
+    id: 'ensemble-prompt-injection-banking',
+    title: 'Three models voting: what we learned putting an ensemble in front of a banking LLM',
+    date: '2026-06-28',
+    read: '9 min',
+    tags: ['llm-security', 'prompt-injection', 'deep-learning', 'paper'],
+    excerpt:
+      'Notes on our ICSCCC 2026 paper — why we stopped trying to build one perfect prompt-injection classifier and built three imperfect ones instead.',
+    body: [
+      'Our paper on prompt-injection detection for banking language models was published at ICSCCC 2026, and this is the informal version of it — the reasoning that does not fit inside a six-page conference format.',
+      'A note on credit before anything else. The paper is by Neha Manoj, myself, Turala Pranav and Devi Rajeev; Neha led it. I am writing up work that four people did, and where I say "we" I mean it literally.',
+      'The setting is narrower than "LLM security" in general, and the narrowness is the point. A model answering questions inside a bank is not a chatbot with an embarrassment problem. It sits near account data, transaction history and, increasingly, tools that can actually do things. The cost of a successful injection is not a rude paragraph. It is disclosure, or an action taken on someone’s behalf that they never asked for.',
+      'That changes which errors you are willing to make. In most classification work you tune toward a balanced trade-off. Here the asymmetry is stark: a false positive means a customer sees an unnecessary refusal and is mildly annoyed, while a false negative may mean an attacker has walked through the front door. You accept a fair amount of the first to reduce the second, and you say so explicitly rather than optimising a metric that hides the choice.',
+      'The obvious approach is a single classifier — take a transformer, fine-tune it on injection and benign prompts, put it in front of the model. We started there. The problem is that a single model has a single set of blind spots, and an attacker only has to find one of them. Worse, those blind spots are systematic rather than random: they follow from what that architecture attends to, which means an attack that slips past it once will slip past it reliably, forever, until someone retrains.',
+      'So the paper uses an ensemble — BERT, RoBERTa and DistilBERT — with their predictions aggregated by weighted vote. The bet is not that any one of them is excellent. It is that their mistakes are less correlated than their successes, and that an attack shaped to exploit one model’s inductive biases is unlikely to exploit all three in the same way. Diversity of failure is the actual product.',
+      'DistilBERT earns its place for a different reason: it is small and fast. If a detector adds meaningful latency to every request, it will eventually be argued out of the deployment by whoever owns the latency budget. A security control that gets disabled for performance reasons provides no security at all, so inference cost is a security property, not an engineering afterthought.',
+      'The data pipeline turned out to be most of the work, as it usually does. Around 154,000 samples had to be cleaned, deduplicated, tokenised and batched, and the part that mattered most was making sure near-duplicates did not straddle the train and test split. Prompt-injection corpora are full of templated variants of the same underlying trick. If a paraphrase of a training example ends up in your test set, you will measure something impressive and learn nothing.',
+      'The attacks we cared about were the ones that survive superficial filtering: jailbreak framings, semantic obfuscation that preserves meaning while changing surface form, role-play that relocates the request into fiction, and multi-turn injections where no individual message is incriminating and only the trajectory is. That last category is the one most single-shot evaluations miss entirely, and it is the category I have since spent most of my bug-bounty time on.',
+      'SHAP is in the paper because a verdict a security team cannot interrogate is a verdict they will not act on. "Blocked, confidence 0.97" tells an analyst nothing about whether the system is working or quietly drifting. Attributing the decision back to the tokens that drove it lets a human check whether the model latched onto the actual attack or onto some artefact of how the dataset was built — which, more than once, is exactly what it had done.',
+      'The headline number in the paper is high precision, and I want to be careful about what that does and does not mean. It is a measurement on a held-out split of a particular corpus, against the attack families that corpus contains. It is evidence the approach is sound. It is not a claim about novel attacks invented after the dataset was frozen, and anyone reading a number like that off a paper — including ours — should ask which distribution it was measured on before deciding what it predicts.',
+      'The honest limitation is that an ensemble of transformers still classifies text, and classifying text is a fundamentally different activity from establishing where an instruction came from. The reason injection is hard is architectural: the model cannot distinguish developer intent from user text because both arrive as the same undifferentiated stream. A detector in front of it is mitigation, not resolution. It raises cost for an attacker without changing what makes the attack possible, and I would rather state that plainly than let the accuracy figure imply otherwise.',
+      'What I took from the project was mostly about evaluation. It is easy to build something that scores well and much harder to build something whose score you believe. Most of our real effort went into the second thing.',
+    ],
+  },
+  {
+    id: 'fingerprint-spoof-deepfakes',
+    title: 'When the fake fingerprints started coming from a GAN',
+    date: '2026-06-14',
+    read: '8 min',
+    tags: ['biometrics', 'deep-learning', 'computer-vision', 'paper'],
+    excerpt:
+      'Our Procedia Computer Science paper on ensemble spoof detection — and why generated fingerprints break assumptions that gelatin and latex never did.',
+    body: [
+      'Our paper on fingerprint spoof detection against AI-generated deepfakes appeared in Procedia Computer Science this year. Turala Pranav led it; the authors are Pranav, myself, Neha Manoj and Devi Rajeev. This is the longer, less formal account of what the work was actually about.',
+      'Fingerprint liveness detection is an old problem with a well-worn threat model. Someone lifts a print, casts it in gelatin or silicone or wood glue, and presents the cast to a sensor. Detectors learned to catch this by looking for the physical signatures of casting: the way ridges deform under pressure, moisture and pore patterns, the optical behaviour of a material that is not skin.',
+      'Generative models break that model of the problem in a way that is easy to state and awkward to fix. A GAN-synthesised fingerprint was never cast from anything. It has no material. It is not a photograph of a physical object at all — it is an image sampled directly from a distribution learned over real fingerprint images. Every artefact your detector was trained to find is an artefact of a physical process that did not occur.',
+      'So a detector tuned on classic presentation attacks does not merely perform slightly worse on generated ones. It is often looking for the wrong category of evidence entirely, and its confidence stays high while it does so — which is the failure mode you least want from a biometric system, because nothing about the output signals that it has left the domain it was validated on.',
+      'The approach in the paper is an ensemble: EfficientNet-B0, ResNet-18, and a DIET-CNN, trained in PyTorch across roughly 13,000 samples including GAN-generated synthetics, with predictions combined by weighted inference. The reasoning parallels the prompt-injection work — different architectures fail differently, and when the failure modes are less correlated than the successes, combining them buys real robustness rather than just averaging noise.',
+      'Mixing architecture families was deliberate. EfficientNet and ResNet do not carry the same inductive biases about scale and receptive field, and a synthetic artefact that is invisible at one effective resolution is often obvious at another. An ensemble of three near-identical models would have been much less useful, and much easier to build.',
+      'The reported accuracy is 96.7%, with ROC and confusion-matrix analysis and a look at feature separability to check the ensemble was finding a genuine decision boundary rather than exploiting some incidental property of the dataset. That last check matters more than the headline figure. Biometric spoof datasets are notoriously easy to overfit — capture conditions, sensor characteristics and preprocessing all leak signal that has nothing to do with liveness, and a model that learns "images from this capture session are fake" will look excellent right up until deployment.',
+      'The caveat I would attach to the number is the one that applies to this entire field: generative models improve continuously, and a detector trained against the outputs of one generation of them is a snapshot, not a solution. The paper demonstrates the ensemble approach generalises better than a single model on the data we had. It cannot demonstrate anything about a generator trained after we froze the dataset, and treating a spoof detector as a permanently solved component is exactly the mistake this whole line of work exists to warn against.',
+      'What stayed with me is how cleanly this maps onto the LLM security work I do now, which surprised me at the time. In both cases a defence is trained to recognise a distribution of attacks, both are evaluated against that distribution, and both quietly assume the distribution holds still. It does not. Whether the artefact is a synthetic ridge pattern or a jailbreak phrasing, the interesting question is the same: what happens when the attacker moves, and does your system have any way of noticing that it has stopped working?',
+    ],
+  },
+  {
+    id: 'anpr-traffic-enforcement',
+    title: 'Reading number plates at night: notes from my first paper',
+    date: '2026-05-24',
+    read: '6 min',
+    tags: ['computer-vision', 'paper', 'learning'],
+    excerpt:
+      'A short retrospective on the ANPR work I contributed to as a second-year student, and what a deceptively simple problem taught me about deployment conditions.',
+    body: [
+      'The first paper I had my name on was about automated licence plate recognition for traffic enforcement, presented at ACROSET in 2024. I was the third of five authors and a second-year undergraduate at the time, so I want to be accurate about my role: I contributed to a project that Sam M G Harish and Aksharasree S led, alongside Mamatha S and Vipina Valsan. This is a retrospective on what I learned, not a claim to have driven it.',
+      'Automated plate recognition sounds like a solved problem, and in a sense it is — detect the plate, segment the characters, recognise them, done. That description is accurate and almost entirely useless, because essentially all of the difficulty lives in conditions rather than in the algorithm.',
+      'The condition that dominated our work was night. A daylight benchmark tells you very little about a system that has to run at three in the morning, when the plate is lit by headlights rather than the sun. Retroreflective plate material is engineered to send light straight back toward its source, which is excellent for a human driver and unhelpful for a camera: the plate blows out into a bright rectangle while the characters vanish into it. Meanwhile oncoming headlights introduce glare that moves, and vehicle motion adds blur that scales with exposure time — and longer exposure is exactly the thing you reach for in low light. Every obvious fix trades against another.',
+      'This is where I learned the difference between a benchmark and a deployment. It is straightforward to reach a satisfying accuracy figure on a clean dataset of well-lit, roughly frontal plates. It is much harder to hold that figure across weather, angle, speed, plate condition, regional format variation, and the entire span between noon and midnight. The gap between those two numbers is not a detail to be tuned away later. It is the actual engineering problem, and I did not understand that before this project.',
+      'The other thing that has stuck with me is less technical. This was enforcement software, which means its errors are not evenly distributed in consequence. A false negative is a missed violation. A false positive is a person receiving a penalty they did not earn, with the burden of disproving a machine falling on them. Those two failures cost very different amounts to very different people, and a system that reports a single accuracy figure has already flattened that distinction out of view.',
+      'I would not present this paper as my strongest work; it is a second-year undergraduate contribution to a team effort, and I would approach several parts of it differently now. But it is where I first ran into the pattern that shows up in everything I have done since — that the interesting failures are almost never in the method, and almost always in the conditions the method was never evaluated against. My later work on spoof detection and prompt injection is the same lesson wearing different clothes.',
+    ],
+  },
+];
+
+/** Newest first — the Writing index and sitemap render these in array order. */
+export const posts: readonly Post[] = [...featuredPosts, ...paperPosts];
 
 export function getPost(id: string): Post | undefined {
   return posts.find((p) => p.id === id);

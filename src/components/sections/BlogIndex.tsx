@@ -5,6 +5,16 @@ import { Section } from '@/components/ui/Section';
 import { Reveal } from '@/components/ui/Reveal';
 
 export function BlogIndex() {
+  if (posts.length === 0) {
+    return (
+      <Section width="narrow">
+        <Reveal as="p" className="border-line text-dim border-t pt-[clamp(28px,4vw,46px)] text-[15px]">
+          Nothing published yet — notes and write-ups will land here.
+        </Reveal>
+      </Section>
+    );
+  }
+
   return (
     <Section width="narrow">
       {posts.map((post) => (
