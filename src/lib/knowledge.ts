@@ -19,10 +19,19 @@ export function buildKnowledgeBase(): string {
   const projectLines = projects
     .map((p) => `${p.title} — ${p.tag}. ${p.desc} Results: ${p.results}`)
     .join(' ');
-  const publicationLines = publications.map((p) => `"${p.title}" (${p.venue}, ${p.date})`).join('; ');
+  const publicationLines = publications
+    .map((p) => `"${p.title}" (${p.venue}, ${p.date}; authors: ${p.authors.join(', ')}). ${p.abstract}`)
+    .join(' ');
   const socLines = socAreas.map((a) => `${a.area} (tools: ${a.tools.join(', ')})`).join('; ');
-  const honorLines = honors.map((h) => `${h.title} — ${h.org} (${h.date})`).join('; ');
-  const postLines = posts.map((p) => `"${p.title}" (${p.read})`).join('; ');
+  // Descriptions and excerpts are included, not just titles — without them the
+  // assistant knew a bounty or article existed but had to decline every
+  // question about what was actually in it.
+  const honorLines = honors
+    .map((h) => `${h.title} — ${h.org} (${h.date})${h.amount ? `, ${h.amount}` : ''}. ${h.desc}`)
+    .join(' ');
+  const postLines = posts
+    .map((p) => `"${p.title}" (${p.date}, ${p.read}) — ${p.excerpt}`)
+    .join(' ');
 
   return [
     `BIO: ${bio.join(' ')}`,

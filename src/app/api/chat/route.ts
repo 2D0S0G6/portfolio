@@ -1,4 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { NextResponse } from 'next/server';
 import { buildKnowledgeBase } from '@/lib/knowledge';
 import { site } from '@/data/site';
@@ -9,12 +8,24 @@ const MAX_HISTORY = 8;
 /** Rejected before the body is parsed, so a huge payload is never buffered. */
 const MAX_BODY_BYTES = 32 * 1024;
 
-/** Per-IP token bucket. Best-effort only — resets on redeploy and is per-instance. */
+/**
+ * Per-IP token bucket. Deliberately a speed bump, not a wall: the map is
+ * per-instance and resets on redeploy, so a serverless deployment enforces this
+ * per warm instance rather than globally. It stops a naive `while true` curl
+ * loop from draining the quota; for a hard guarantee, put a platform-level rule
+ * or a shared store (Upstash et al.) in front.
+ *
+ * 20/min leaves room for an engaged visitor to hold a real conversation.
+ */
 const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX = 12;
+const RATE_LIMIT_MAX = 20;
 const hits = new Map<string, number[]>();
 
-/** Cap the handler so a slow completion fails fast instead of hanging the platform. */
+const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const UPSTREAM_TIMEOUT_MS = 20_000;
+
+/** Cap the handler so a slow completion fails fast instead of hanging. */
 export const maxDuration = 30;
 
 type Mode = 'guide' | 'explain';
@@ -26,7 +37,7 @@ interface ChatRequest {
 
 /**
  * Built once at module load — the knowledge base is derived from static data,
- * so rebuilding it per request only burned CPU and broke prompt-cache reuse.
+ * so rebuilding it per request only burned CPU.
  */
 const KNOWLEDGE_BASE = buildKnowledgeBase();
 
@@ -39,12 +50,6 @@ const SYSTEM_PROMPTS: Record<Mode, string> = {
     "You explain highlighted text from a security & AI researcher's portfolio to a curious visitor. " +
     'Give a clear, friendly explanation in 1-3 sentences, plain language. If it is a technical term, define it simply.',
 };
-
-/** Reused across requests so the connection pool and keep-alive survive. */
-let client: Anthropic | null = null;
-function getClient(apiKey: string): Anthropic {
-  return (client ??= new Anthropic({ apiKey }));
-}
 
 /** True when this caller has spare budget in the current window. */
 function withinRateLimit(key: string): boolean {
@@ -70,7 +75,7 @@ function withinRateLimit(key: string): boolean {
 }
 
 export async function POST(request: Request) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
 
   // The site is fully functional without a key — the assistant just says so.
   if (!apiKey) {
@@ -97,7 +102,7 @@ export async function POST(request: Request) {
   const { mode: rawMode, messages: rawMessages } = body as ChatRequest;
   const mode: Mode = rawMode === 'explain' ? 'explain' : 'guide';
 
-  const messages = (Array.isArray(rawMessages) ? rawMessages : [])
+  const history = (Array.isArray(rawMessages) ? rawMessages : [])
     .filter((m) => m && typeof m.content === 'string' && m.content.trim().length > 0)
     .slice(-MAX_HISTORY)
     .map((m) => ({
@@ -105,40 +110,46 @@ export async function POST(request: Request) {
       content: String(m.content).slice(0, MAX_MESSAGE_LENGTH),
     }));
 
-  // The Messages API requires the conversation to begin with a user turn.
-  while (messages.length > 0 && messages[0].role !== 'user') messages.shift();
-
-  if (messages.length === 0) {
+  if (history.length === 0) {
     return NextResponse.json({ error: 'No message provided.' }, { status: 400 });
   }
 
-  try {
-    const response = await getClient(apiKey).messages.create(
-      {
-        model: 'claude-sonnet-5',
-        // Sonnet 5 runs adaptive thinking when `thinking` is omitted, and
-        // `max_tokens` caps thinking + text together. These are short grounded
-        // answers, so thinking is disabled explicitly — otherwise the budget can
-        // be spent reasoning and the response arrives with no text block at all.
-        thinking: { type: 'disabled' },
-        output_config: { effort: 'low' },
-        max_tokens: mode === 'explain' ? 400 : 800,
-        system: SYSTEM_PROMPTS[mode],
-        messages,
-      },
-      { signal: request.signal, timeout: 20_000 },
-    );
+  // Abort on either a slow upstream or the visitor closing the tab, so a
+  // dropped connection stops consuming quota.
+  const signal = AbortSignal.any([request.signal, AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)]);
 
-    if (response.stop_reason === 'refusal') {
-      return NextResponse.json({ text: "I can't help with that one — try asking another way." });
+  try {
+    // Groq speaks the OpenAI chat-completions shape, so the system prompt is a
+    // leading message rather than a separate top-level field.
+    const upstream = await fetch(GROQ_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        max_tokens: mode === 'explain' ? 400 : 800,
+        temperature: 0.6,
+        messages: [{ role: 'system', content: SYSTEM_PROMPTS[mode] }, ...history],
+      }),
+      signal,
+    });
+
+    if (!upstream.ok) {
+      // Log the status only — the body can echo back request content.
+      console.error('[api/chat] upstream', upstream.status);
+      return NextResponse.json(
+        { error: 'The assistant is unavailable right now.' },
+        { status: 502 },
+      );
     }
 
-    const text = response.content
-      .filter((block) => block.type === 'text')
-      .map((block) => block.text)
-      .join('')
-      .trim();
+    const payload = (await upstream.json()) as {
+      choices?: { message?: { content?: string }; finish_reason?: string }[];
+    };
 
+    const text = payload.choices?.[0]?.message?.content?.trim() ?? '';
     if (!text) {
       return NextResponse.json({ error: 'The assistant returned an empty reply.' }, { status: 502 });
     }

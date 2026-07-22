@@ -23,8 +23,12 @@ npm run dev      # http://localhost:3000
 
 Copy `.env.example` to `.env.local`. Both variables are optional:
 
-- `ANTHROPIC_API_KEY` — enables the "Ask the site" assistant and the "Explain this" popover. Without it, both still render and reply with a clear "not configured" message; nothing else on the site is affected.
-- `NEXT_PUBLIC_SITE_URL` — absolute origin used for canonical URLs, Open Graph and `sitemap.xml`. Defaults to `https://example.com`, so **set this before deploying**.
+- `GROQ_API_KEY` — enables the "Ask the site" assistant and the "Explain this" popover, served by Groq (`llama-3.3-70b-versatile`). Without it, both still render and reply with a clear "not configured" message; nothing else on the site is affected.
+- `NEXT_PUBLIC_SITE_URL` — absolute origin used for canonical URLs, Open Graph and `sitemap.xml`. Defaults to the production Vercel URL.
+
+On Vercel, set the same variables under **Settings → Environment Variables**. `GROQ_API_KEY` must **not** be prefixed `NEXT_PUBLIC_` — that would ship the secret to the browser.
+
+`/api/chat` applies a per-IP rate limit, a request-size cap and an upstream timeout, but the limiter is in-memory and therefore per-instance. It deters a casual abuse loop; it is not a hard quota guarantee.
 
 ## Where to edit content
 
