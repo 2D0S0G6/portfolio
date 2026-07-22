@@ -36,9 +36,17 @@ export function Hero() {
         <span className="sr-only">
           {site.name} — {site.role}
         </span>
+        {/*
+          21vw, not 24vw. Measured from the shipped Bricolage ExtraBold file,
+          "2D0S0G6" advances 4.707em, or 4.392em once the -0.045em tracking is
+          applied across all seven glyphs. At 24vw that is 105% of the viewport,
+          so the leading 2 and trailing 6 were clipped at every width. 21vw puts
+          it at ~92% — still near full-bleed, but it always fits. The 56px floor
+          keeps that true below a ~305px viewport.
+        */}
         <span
           aria-hidden="true"
-          className="font-display text-text block text-[clamp(64px,24vw,440px)] leading-[0.8] font-extrabold tracking-[-0.045em]"
+          className="font-display text-text block text-[clamp(56px,21vw,440px)] leading-[0.8] font-extrabold tracking-[-0.045em]"
         >
           2D0
           <span className="text-transparent [-webkit-text-stroke:clamp(2px,0.4vw,4px)_var(--text)]">S</span>
