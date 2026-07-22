@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChatMessage } from '@/types';
 import { askAssistant } from '@/lib/assistant';
@@ -19,7 +20,12 @@ const GREETING: ChatMessage = {
  * inner route), then expands into a small chat panel.
  */
 export function ChatDock() {
-  const [visible, setVisible] = useState(false);
+  const pathname = usePathname();
+  /** Only the homepage hides it initially — there it would cover the hero. */
+  const deferToScroll = pathname === '/';
+  const [scrolledPast, setScrolledPast] = useState(false);
+  /** Derived, not stored — storing it would mean a setState inside the effect. */
+  const visible = !deferToScroll || scrolledPast;
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([GREETING]);
   const [loading, setLoading] = useState(false);
@@ -37,13 +43,19 @@ export function ChatDock() {
   }, []);
 
   useEffect(() => {
+    // The doc comment always promised "immediately on any inner route", but the
+    // check was purely scroll-based — so on /contact, /projects and every other
+    // page the launcher stayed hidden until you scrolled half a viewport, which
+    // is most of the reason nobody would find the assistant.
+    if (!deferToScroll) return;
+
     function onScroll() {
-      setVisible(window.scrollY > (window.innerHeight || 800) * 0.55);
+      setScrolledPast(window.scrollY > (window.innerHeight || 800) * 0.55);
     }
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
-  }, []);
+  }, [deferToScroll]);
 
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;

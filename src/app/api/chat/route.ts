@@ -139,10 +139,7 @@ export async function POST(request: Request) {
     if (!upstream.ok) {
       // Log the status only — the body can echo back request content.
       console.error('[api/chat] upstream', upstream.status);
-      return NextResponse.json(
-        { error: 'The assistant is unavailable right now.' },
-        { status: 502 },
-      );
+      return NextResponse.json({ error: 'The assistant is unavailable right now.' }, { status: 502 });
     }
 
     const payload = (await upstream.json()) as {

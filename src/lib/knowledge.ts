@@ -29,9 +29,7 @@ export function buildKnowledgeBase(): string {
   const honorLines = honors
     .map((h) => `${h.title} — ${h.org} (${h.date})${h.amount ? `, ${h.amount}` : ''}. ${h.desc}`)
     .join(' ');
-  const postLines = posts
-    .map((p) => `"${p.title}" (${p.date}, ${p.read}) — ${p.excerpt}`)
-    .join(' ');
+  const postLines = posts.map((p) => `"${p.title}" (${p.date}, ${p.read}) — ${p.excerpt}`).join(' ');
 
   return [
     `BIO: ${bio.join(' ')}`,

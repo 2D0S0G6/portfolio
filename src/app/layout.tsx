@@ -90,7 +90,7 @@ const personJsonLd = {
   alumniOf: { '@type': 'CollegeOrUniversity', name: education.school },
   address: {
     '@type': 'PostalAddress',
-    addressLocality: 'Agasthiswaram',
+    addressLocality: 'Nagercoil',
     addressRegion: 'Tamil Nadu',
     addressCountry: 'IN',
   },

@@ -19,7 +19,7 @@ export const contact: Contact = {
   linkedin: 'https://www.linkedin.com/in/dsgdeepak',
   x: 'https://x.com/DeepakSG67',
   odin: 'https://0din.ai/researchers/b0b505fc-957b-43a9-b5a3-145b2d8799db',
-  location: 'Agasthiswaram, Tamil Nadu, India',
+  location: 'Nagercoil, Tamil Nadu, India',
   availability: 'Open to research collaborations & internships',
 };
 

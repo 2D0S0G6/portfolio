@@ -121,7 +121,7 @@ const paperPosts: readonly Post[] = [
   },
   {
     id: 'anpr-traffic-enforcement',
-    title: 'Reading number plates at night: notes from my first paper',
+    title: 'Reading license plates at night: notes from my first paper',
     date: '2026-05-24',
     read: '6 min',
     tags: ['computer-vision', 'paper', 'learning'],
