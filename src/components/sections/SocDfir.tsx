@@ -25,7 +25,7 @@ export function SocDfir() {
         >
           <p className="text-dim max-w-[58ch] text-[15.5px] leading-[1.7]">{area.desc}</p>
 
-          <div className="mt-6 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-7">
+          <div className="mt-6 grid grid-cols-[repeat(auto-fit,minmax(min(100%,220px),1fr))] gap-7">
             <TagField label="Tools" items={area.tools} />
             <Field label="Key methods">
               <MarkerList items={area.methods} marker="—" size="sm" />

@@ -56,7 +56,7 @@ export function Article({ post, related }: ArticleProps) {
         <aside className="border-line bg-bg2 border-t">
           <Container width="narrow" className="py-[clamp(40px,6vw,72px)]">
             <Eyebrow as="h2">Keep reading</Eyebrow>
-            <ul className="mt-6 grid list-none grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-[18px] p-0">
+            <ul className="mt-6 grid list-none grid-cols-[repeat(auto-fit,minmax(min(100%,240px),1fr))] gap-[18px] p-0">
               {related.map((item) => (
                 <li key={item.id}>
                   <Link
@@ -69,9 +69,9 @@ export function Article({ post, related }: ArticleProps) {
                     >
                       {formatDate(item.date)}
                     </time>
-                    <div className="font-display mt-2.5 text-[19px] leading-[1.15] font-bold tracking-[-0.01em]">
+                    <h3 className="font-display mt-2.5 text-[19px] leading-[1.15] font-bold tracking-[-0.01em]">
                       {item.title}
-                    </div>
+                    </h3>
                   </Link>
                 </li>
               ))}

@@ -53,7 +53,9 @@ export function SplitRow({
       )}
     >
       <div className={gutters[gutter]}>{aside}</div>
-      <div className="flex-[1_1_min(100%,460px)]">{children}</div>
+      {/* min-w-0: a flex item's auto minimum would otherwise stop long DOIs
+          and titles from shrinking below their min-content width. */}
+      <div className="min-w-0 flex-[1_1_min(100%,460px)]">{children}</div>
     </Reveal>
   );
 }

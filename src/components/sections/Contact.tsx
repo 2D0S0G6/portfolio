@@ -39,7 +39,7 @@ export function Contact() {
   return (
     <section className="animate-pf-fade pt-[clamp(28px,4vw,52px)] pb-[clamp(52px,8vw,104px)]">
       <Container>
-        <Reveal className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-[clamp(36px,6vw,80px)]">
+        <Reveal className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,300px),1fr))] gap-[clamp(36px,6vw,80px)]">
           <div>
             <Eyebrow as="h2">Email</Eyebrow>
             <div className="mt-3.5">

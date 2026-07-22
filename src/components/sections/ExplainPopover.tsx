@@ -105,7 +105,13 @@ export function ExplainPopover() {
 
   if (!selection) return null;
 
-  const clampedX = Math.min(Math.max(selection.x, 120), window.innerWidth - 120);
+  // The edge margin has to be derived from the popover's real width. A
+  // hardcoded 120 assumed a 240px panel, but the dialog is min(300px, 100vw-32px)
+  // — so on every phone width the panel hung ~30px off the side of the screen,
+  // where `overflow-x: hidden` made it unreachable.
+  const viewportWidth = window.innerWidth;
+  const edgeMargin = Math.min(300, viewportWidth - 32) / 2 + 8;
+  const clampedX = Math.min(Math.max(selection.x, edgeMargin), viewportWidth - edgeMargin);
   const clampedY = Math.max(selection.y, 70);
 
   return (
@@ -126,16 +132,20 @@ export function ExplainPopover() {
               type="button"
               onClick={dismiss}
               aria-label="Close explanation"
-              className="text-dim hover:text-text cursor-pointer border-none bg-transparent text-sm leading-none"
+              className="text-dim hover:text-text -mr-2 flex h-11 w-11 cursor-pointer items-center justify-center border-none bg-transparent text-sm leading-none"
             >
               ✕
             </button>
           </div>
-          {loading ? (
-            <TypingDots className="py-1" />
-          ) : (
-            <p className="text-text text-[13px] leading-[1.6]">{text}</p>
-          )}
+          {/* The whole point of this component is the async reply — without a
+              live region a screen-reader user never hears it arrive. */}
+          <div aria-live="polite" aria-busy={loading}>
+            {loading ? (
+              <TypingDots className="py-1" />
+            ) : (
+              <p className="text-text text-[13px] leading-[1.6]">{text}</p>
+            )}
+          </div>
         </div>
       ) : (
         <button

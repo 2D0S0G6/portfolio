@@ -42,7 +42,7 @@ export function Footer() {
   return (
     <footer className="border-line bg-bg2 relative z-1 border-t">
       <Container width="wide" className="py-[clamp(48px,7vw,80px)]">
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-10">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,200px),1fr))] gap-10">
           <div>
             <div className="font-display text-[34px] leading-none font-extrabold tracking-[-0.03em]">
               {site.wordmark}

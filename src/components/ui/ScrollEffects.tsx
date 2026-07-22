@@ -14,7 +14,12 @@ export function ScrollEffects() {
   const barRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Queried once — the element's identity never changes for the life of the
+    // effect, and this ran on every scroll frame.
+    const plate = document.querySelector<HTMLElement>('[data-hero-plate]');
+    // Read live rather than latched at mount, so a mid-session preference
+    // change actually stops the parallax.
+    const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     let frame = 0;
 
     function update() {
@@ -27,9 +32,10 @@ export function ScrollEffects() {
         barRef.current.style.transform = `scaleX(${progress})`;
       }
 
-      if (!prefersReduced) {
-        const plate = document.querySelector<HTMLElement>('[data-hero-plate]');
-        if (plate) plate.style.transform = `translateY(${window.scrollY * 0.26}px) scale(1.1)`;
+      if (plate) {
+        plate.style.transform = motionQuery.matches
+          ? ''
+          : `translateY(${window.scrollY * 0.26}px) scale(1.1)`;
       }
     }
 
@@ -42,6 +48,7 @@ export function ScrollEffects() {
     return () => {
       window.removeEventListener('scroll', onScroll);
       if (frame) cancelAnimationFrame(frame);
+      if (plate) plate.style.transform = '';
     };
   }, []);
 
@@ -49,7 +56,9 @@ export function ScrollEffects() {
     <div
       ref={barRef}
       aria-hidden="true"
-      className="bg-text fixed top-0 right-0 left-0 z-[96] h-0.5 origin-left scale-x-0 opacity-85"
+      // z-94 keeps the bar above the navbar (60) but below the menu overlay
+      // (95), which it previously painted across.
+      className="bg-text fixed top-0 right-0 left-0 z-[94] h-0.5 origin-left scale-x-0 opacity-85"
     />
   );
 }

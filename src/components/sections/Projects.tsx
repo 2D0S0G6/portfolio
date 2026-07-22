@@ -26,7 +26,7 @@ export function Projects() {
             {project.desc}
           </p>
 
-          <div className="mt-[clamp(30px,4vw,44px)] grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-[clamp(24px,4vw,52px)]">
+          <div className="mt-[clamp(30px,4vw,44px)] grid grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] gap-[clamp(24px,4vw,52px)]">
             <Field label="Problem">
               <p className="text-dim text-[15px] leading-[1.65]">{project.problem}</p>
             </Field>
@@ -35,7 +35,7 @@ export function Projects() {
             </Field>
           </div>
 
-          <div className="mt-[clamp(26px,3vw,40px)] grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-[clamp(24px,4vw,52px)]">
+          <div className="mt-[clamp(26px,3vw,40px)] grid grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] gap-[clamp(24px,4vw,52px)]">
             <TagField label="Stack" items={project.tech} />
             <Field label="Highlights">
               <MarkerList items={project.highlights} marker="·" size="sm" />

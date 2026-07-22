@@ -36,7 +36,7 @@ export function About() {
               </span>
             </div>
 
-            <div className="mt-[clamp(30px,4vw,44px)] grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-[clamp(24px,4vw,48px)]">
+            <div className="mt-[clamp(30px,4vw,44px)] grid grid-cols-[repeat(auto-fit,minmax(min(100%,220px),1fr))] gap-[clamp(24px,4vw,48px)]">
               <Field label="Activities">
                 <MarkerList items={education.activities} marker="—" />
               </Field>

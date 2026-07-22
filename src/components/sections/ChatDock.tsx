@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChatMessage } from '@/types';
 import { askAssistant } from '@/lib/assistant';
 import { cn } from '@/lib/utils';
@@ -26,6 +26,15 @@ export function ChatDock() {
 
   const bodyRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  /** Latch in a ref, not state — `loading` is stale inside a concurrent send(). */
+  const inFlight = useRef(false);
+
+  /** Returns focus to the trigger; closing otherwise dropped focus to <body>. */
+  const close = useCallback(() => {
+    setOpen(false);
+    requestAnimationFrame(() => triggerRef.current?.focus());
+  }, []);
 
   useEffect(() => {
     function onScroll() {
@@ -47,30 +56,36 @@ export function ChatDock() {
   useEffect(() => {
     if (!open) return;
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') setOpen(false);
+      if (event.key === 'Escape') close();
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [open]);
+  }, [open, close]);
 
   async function send() {
     const input = inputRef.current;
     const question = input?.value.trim();
-    if (!input || !question || loading) return;
+    if (!input || !question || inFlight.current) return;
+    inFlight.current = true;
 
     input.value = '';
     const next: ChatMessage[] = [...messages, { role: 'user', content: question }];
     setMessages(next);
     setLoading(true);
 
-    // Drop the canned greeting — the API requires a leading user turn.
-    const reply = await askAssistant(
-      next.filter((m, i) => !(i === 0 && m.role === 'assistant')),
-      'guide',
-    );
-
-    setMessages([...next, { role: 'assistant', content: reply }]);
-    setLoading(false);
+    try {
+      // Drop the canned greeting — the API requires a leading user turn.
+      const reply = await askAssistant(
+        next.filter((m, i) => !(i === 0 && m.role === 'assistant')),
+        'guide',
+      );
+      // Functional update: a concurrent send would otherwise overwrite the
+      // transcript with a `next` that never held the first question.
+      setMessages((prev) => [...prev, { role: 'assistant', content: reply }]);
+    } finally {
+      setLoading(false);
+      inFlight.current = false;
+    }
   }
 
   if (!visible && !open) return null;
@@ -90,15 +105,22 @@ export function ChatDock() {
             </div>
             <button
               type="button"
-              onClick={() => setOpen(false)}
+              onClick={close}
               aria-label="Close assistant"
-              className="text-dim hover:text-text h-7 w-7 cursor-pointer border-none bg-transparent text-base transition-colors"
+              className="text-dim hover:text-text -mr-2 flex h-11 w-11 cursor-pointer items-center justify-center border-none bg-transparent text-base transition-colors"
             >
               ✕
             </button>
           </div>
 
-          <div ref={bodyRef} className="flex flex-1 flex-col gap-3 overflow-y-auto p-4" aria-live="polite">
+          {/* role="log" gives screen readers append-only reading semantics. */}
+          <div
+            ref={bodyRef}
+            role="log"
+            aria-live="polite"
+            aria-busy={loading}
+            className="flex flex-1 flex-col gap-3 overflow-y-auto p-4"
+          >
             {messages.map((message, index) => (
               <div
                 key={`${message.role}-${index}`}
@@ -106,7 +128,9 @@ export function ChatDock() {
               >
                 <p
                   className={cn(
-                    'max-w-[82%] border px-3.5 py-2.5 text-[13.5px] leading-[1.55] whitespace-pre-wrap',
+                    // overflow-wrap:anywhere — model output routinely contains
+                    // URLs and paths that whitespace-pre-wrap alone won't break.
+                    'max-w-[82%] border px-3.5 py-2.5 text-[13.5px] leading-[1.55] [overflow-wrap:anywhere] whitespace-pre-wrap',
                     message.role === 'user'
                       ? 'border-text bg-text text-btn-ink'
                       : 'border-line2 text-text bg-transparent',
@@ -135,7 +159,7 @@ export function ChatDock() {
               ref={inputRef}
               placeholder="Ask about the work…"
               aria-label="Message"
-              className="bg-bg border-line text-text placeholder:text-faint flex-1 border px-3 py-2.5 text-[13.5px] outline-none"
+              className="bg-bg border-line text-text placeholder:text-faint flex-1 border px-3 py-2.5 text-[16px] sm:text-[13.5px]"
             />
             <button
               type="submit"
@@ -150,8 +174,11 @@ export function ChatDock() {
       ) : (
         <button
           type="button"
+          ref={triggerRef}
           onClick={() => setOpen(true)}
           aria-label="Open assistant"
+          aria-haspopup="dialog"
+          aria-expanded={false}
           className="bg-panel border-line text-text hover:border-text hover:bg-raise animate-pf-in flex cursor-pointer items-center gap-2.5 border px-4 py-3 shadow-[0_10px_30px_rgba(0,0,0,0.35)] transition-[border-color,background]"
         >
           <span aria-hidden="true" className="bg-text animate-dot-pulse h-[9px] w-[9px] rounded-full" />

@@ -40,7 +40,9 @@ function FilterPill({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        'border-line cursor-pointer border px-2.5 py-1.5 font-mono text-[11px] tracking-[0.04em] transition-colors',
+        // min-h-11 keeps the hit area at the 44px touch target these pills
+        // otherwise missed by 16px.
+        'border-line flex min-h-11 cursor-pointer items-center border px-3 py-1.5 font-mono text-[11px] tracking-[0.04em] transition-colors',
         active ? 'bg-text text-btn-ink' : 'text-dim hover:text-text bg-transparent',
       )}
     >
@@ -58,8 +60,15 @@ function RepoCard({ repo }: { repo: Repo }) {
         rel="noopener noreferrer"
         className="border-line bg-panel hover:border-dim hover:bg-raise flex h-full min-h-[180px] flex-col gap-3 border p-5 transition-[transform,border-color,background,box-shadow] duration-300 hover:-translate-y-1.5 hover:shadow-[0_18px_42px_rgba(0,0,0,0.42)]"
       >
-        <div className="flex items-center justify-between gap-2.5">
-          <span className="text-text font-mono text-sm tracking-[0.02em]">{repo.name}</span>
+        <div className="flex items-start justify-between gap-2.5">
+          {/*
+            min-w-0 releases the flex item's auto minimum and break-all supplies
+            the break opportunity underscores don't — without both, a name like
+            DeepNFV_Dockerised_Attack_Detection_CNN escapes the card entirely.
+          */}
+          <h2 className="text-text m-0 min-w-0 font-mono text-sm font-normal tracking-[0.02em] break-all">
+            {repo.name}
+          </h2>
           {repo.pinned && (
             <span className="border-line text-faint border px-[7px] py-[3px] font-mono text-[9px] tracking-[0.16em] uppercase">
               Pinned
@@ -147,7 +156,9 @@ export function RepoExplorer() {
               onChange={(event) => setQuery(event.target.value)}
               placeholder="search repositories"
               aria-label="Search repositories"
-              className="border-line text-text placeholder:text-faint w-full border-0 border-b bg-transparent py-[9px] pl-[18px] font-mono text-[13px] outline-none"
+              // 16px at mobile widths stops iOS Safari zooming the viewport on
+              // focus; outline-none is gone so the base :focus-visible ring applies.
+              className="border-line text-text placeholder:text-faint w-full border-0 border-b bg-transparent py-[9px] pl-[18px] font-mono text-[16px] sm:text-[13px]"
             />
           </div>
 
@@ -176,7 +187,7 @@ export function RepoExplorer() {
         </p>
 
         {visible.length > 0 ? (
-          <ul className="grid list-none grid-cols-[repeat(auto-fill,minmax(272px,1fr))] gap-3.5 p-0">
+          <ul className="grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,272px),1fr))] gap-3.5 p-0">
             {visible.map((repo) => (
               <RepoCard key={repo.name} repo={repo} />
             ))}

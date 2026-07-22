@@ -23,24 +23,51 @@ interface MenuOverlayProps {
  * Behaves as a modal dialog: Escape closes it, background scrolling is locked,
  * and focus moves to the close button on open so keyboard users land inside it.
  */
+const FOCUSABLE = 'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
 export function MenuOverlay({ open, onClose, pathname }: MenuOverlayProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
 
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') {
+        onClose();
+        return;
+      }
+
+      // `aria-modal` hides the page from the SR virtual cursor but does nothing
+      // for Tab — without this, tabbing past the last link lands on invisible
+      // content behind the opaque overlay.
+      if (event.key !== 'Tab') return;
+      const items = dialogRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE);
+      if (!items?.length) return;
+
+      const first = items[0];
+      const last = items[items.length - 1];
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     }
 
     document.addEventListener('keydown', onKeyDown);
     const previousOverflow = document.body.style.overflow;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
     document.body.style.overflow = 'hidden';
     closeRef.current?.focus();
 
     return () => {
       document.removeEventListener('keydown', onKeyDown);
       document.body.style.overflow = previousOverflow;
+      // Otherwise focus falls to <body> and the next Tab restarts at the top.
+      previouslyFocused?.focus();
     };
   }, [open, onClose]);
 
@@ -48,6 +75,7 @@ export function MenuOverlay({ open, onClose, pathname }: MenuOverlayProps) {
 
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label="Site index"
@@ -62,13 +90,17 @@ export function MenuOverlay({ open, onClose, pathname }: MenuOverlayProps) {
           type="button"
           onClick={onClose}
           aria-label="Close menu"
-          className="border-line text-text hover:border-text h-[38px] w-[38px] cursor-pointer border bg-transparent text-lg leading-none transition-colors"
+          className="border-line text-text hover:border-text h-11 w-11 cursor-pointer border bg-transparent text-lg leading-none transition-colors"
         >
           ✕
         </button>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-[clamp(16px,4vw,44px)] py-[clamp(20px,5vw,60px)]">
+      {/* Labelled because the primary nav is also in the DOM while this is open. */}
+      <nav
+        aria-label="All sections"
+        className="flex-1 overflow-y-auto px-[clamp(16px,4vw,44px)] py-[clamp(20px,5vw,60px)]"
+      >
         <IndexRow
           href="/"
           n="01"

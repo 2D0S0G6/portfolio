@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useRef, type MouseEvent, type ReactNode } from 'react';
+import { usePrefersReducedMotion } from '@/lib/hooks';
 
 interface MagneticCtaProps {
   href: string;
@@ -18,18 +19,38 @@ interface MagneticCtaProps {
  */
 export function MagneticCta({ href, children, 'aria-label': ariaLabel }: MagneticCtaProps) {
   const ref = useRef<HTMLAnchorElement>(null);
+  const rectRef = useRef<DOMRect | null>(null);
+  const frameRef = useRef(0);
+  const prefersReduced = usePrefersReducedMotion();
+
+  // Measured once per hover. getBoundingClientRect() forces synchronous layout,
+  // and calling it on every mousemove alongside a style write produced a
+  // read→write→read thrash loop at pointer-event frequency.
+  function onMouseEnter() {
+    rectRef.current = ref.current?.getBoundingClientRect() ?? null;
+  }
 
   function onMouseMove(event: MouseEvent<HTMLAnchorElement>) {
-    const node = ref.current;
-    if (!node || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const rect = rectRef.current;
+    if (prefersReduced || !rect || frameRef.current) return;
 
-    const rect = node.getBoundingClientRect();
-    const dx = Math.max(-8, Math.min(8, (event.clientX - (rect.left + rect.width / 2)) * 0.35));
-    const dy = Math.max(-8, Math.min(8, (event.clientY - (rect.top + rect.height / 2)) * 0.4));
-    node.style.transform = `translate(${dx}px, ${dy}px)`;
+    const { clientX, clientY } = event;
+    frameRef.current = requestAnimationFrame(() => {
+      frameRef.current = 0;
+      const node = ref.current;
+      if (!node) return;
+      const dx = Math.max(-8, Math.min(8, (clientX - (rect.left + rect.width / 2)) * 0.35));
+      const dy = Math.max(-8, Math.min(8, (clientY - (rect.top + rect.height / 2)) * 0.4));
+      node.style.transform = `translate(${dx}px, ${dy}px)`;
+    });
   }
 
   function reset() {
+    if (frameRef.current) {
+      cancelAnimationFrame(frameRef.current);
+      frameRef.current = 0;
+    }
+    rectRef.current = null;
     if (ref.current) ref.current.style.transform = 'translate(0, 0)';
   }
 
@@ -38,6 +59,7 @@ export function MagneticCta({ href, children, 'aria-label': ariaLabel }: Magneti
       ref={ref}
       href={href}
       aria-label={ariaLabel}
+      onMouseEnter={onMouseEnter}
       onMouseMove={onMouseMove}
       onMouseLeave={reset}
       onBlur={reset}

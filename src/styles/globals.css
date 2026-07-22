@@ -15,11 +15,11 @@
   --raise: #1b1b1b;
   --text: #ece9e3;
   --dim: #a4a19a;
-  --faint: #726f68;
+  /* Lightened from #726f68, which fell to 3.4:1 on --raise (WCAG 1.4.3 needs 4.5:1). */
+  --faint: #86827a;
   --line: rgb(255 255 255 / 0.13);
   --line2: rgb(255 255 255 / 0.06);
   --scrim: rgb(11 11 11 / 0.62);
-  --glow: rgb(240 240 236 / 0.5);
   --grain-op: 0.5;
   --btn-ink: #0d0d0d;
   color-scheme: dark;
@@ -32,11 +32,11 @@
   --raise: #f5f2eb;
   --text: #1b1914;
   --dim: #565248;
-  --faint: #8b867b;
+  /* Darkened from #8b867b, which fell to 2.8:1 on --bg — below even the 3:1 floor. */
+  --faint: #69655c;
   --line: rgb(0 0 0 / 0.17);
   --line2: rgb(0 0 0 / 0.07);
   --scrim: rgb(231 227 219 / 0.66);
-  --glow: rgb(24 20 14 / 0.34);
   --grain-op: 0.42;
   --btn-ink: #e7e3db;
   color-scheme: light;
@@ -184,6 +184,12 @@
     background: var(--bg);
   }
 
+  html {
+    /* Keeps hash targets (the skip link, any in-page anchor) clear of the
+       fixed h-16 navbar instead of landing underneath it. */
+    scroll-padding-top: 4rem;
+  }
+
   body {
     font-family: var(--font-sans);
     color: var(--text);
@@ -244,8 +250,15 @@
     transition: transform 0.25s ease;
   }
 
-  .nav-link:hover::after {
-    transform: scaleX(1);
+  /*
+   * Hand-written, so unlike Tailwind's `hover:` utilities (which emit
+   * `@media (hover: hover)` automatically in v4) this needs its own guard —
+   * otherwise the underline sticks after a tap on touch devices.
+   */
+  @media (hover: hover) {
+    .nav-link:hover::after {
+      transform: scaleX(1);
+    }
   }
 }
 
@@ -256,7 +269,10 @@
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     animation-delay: 0s !important;
+    /* Without this, every Tailwind `transition-*` still ran at full length. */
+    transition-duration: 0.001ms !important;
     transition-delay: 0s !important;
+    scroll-behavior: auto !important;
   }
 
   .reveal,
