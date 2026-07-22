@@ -1,26 +1,25 @@
 import type { Contact, PageMeta, Section, SectionId } from '@/types';
 
 export const site = {
-  name: 'Deepak SG',
+  name: 'Deepak S G',
   /** Stylised wordmark used in the hero watermark and footer. */
   wordmark: '2D0S0G6',
   /** Short mono initials shown in the navbar. */
   initials: 'DSG',
-  role: 'Security Researcher · AI Engineer',
-  tagline:
-    'I break systems to understand them, then teach machines to defend them. Quiet, careful research at the seam of security and AI.',
+  role: 'Security Researcher · AI & IoT Security',
+  tagline: 'Building security solutions at the intersection of AI, cryptography, and practical engineering.',
   description:
-    'Portfolio of Deepak SG — security researcher and AI engineer working on LLM red-teaming, network defence and reverse engineering.',
+    'Portfolio of Deepak S G — cybersecurity researcher and engineer working on AI security, IoT security, and vulnerability research.',
   /** Used for canonical URLs and Open Graph. Override with NEXT_PUBLIC_SITE_URL. */
-  url: process.env.NEXT_PUBLIC_SITE_URL ?? 'https://example.com',
+  url: process.env.NEXT_PUBLIC_SITE_URL ?? 'https://deepaksg.vercel.app',
 } as const;
 
 export const contact: Contact = {
-  github: 'https://github.com/2d0s0g6',
+  github: 'https://github.com/2D0S0G6',
   linkedin: 'https://www.linkedin.com/in/dsgdeepak',
   x: 'https://x.com/DeepakSG67',
   odin: 'https://0din.ai/researchers/b0b505fc-957b-43a9-b5a3-145b2d8799db',
-  location: 'Amritapuri / Coimbatore, India',
+  location: 'Agasthiswaram, Tamil Nadu, India',
   availability: 'Open to research collaborations & internships',
 };
 
@@ -49,7 +48,7 @@ export const sections: readonly Section[] = [
     href: '/projects',
   },
   { id: 'repos', label: 'Repositories', n: '06', blurb: 'Open-source, searchable', href: '/repos' },
-  { id: 'blog', label: 'Writing', n: '07', blurb: 'Notes on research and craft', href: '/blog' },
+  { id: 'blog', label: 'Writing', n: '07', blurb: 'Notes & write-ups — coming soon', href: '/blog' },
   { id: 'publications', label: 'Research', n: '08', blurb: 'Peer-reviewed papers', href: '/publications' },
   { id: 'soc', label: 'SOC & DFIR', n: '09', blurb: 'Blue-team & forensics expertise', href: '/soc' },
   { id: 'honors', label: 'Honors', n: '10', blurb: 'Bounties, wins & recognition', href: '/honors' },
@@ -107,7 +106,7 @@ export const pageMeta: Record<SectionId, PageMeta> = {
     num: '07',
     eyebrow: 'Writing',
     title: 'Notes & essays',
-    intro: 'On research, craft, and the quiet parts of the work.',
+    intro: 'Write-ups on security research and the things I build. First ones on the way.',
   },
   publications: {
     num: '08',
