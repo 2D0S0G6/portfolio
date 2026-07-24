@@ -25,6 +25,17 @@ const nextConfig: NextConfig = {
     root: path.join(__dirname),
   },
   poweredByHeader: false,
+  async redirects() {
+    return [
+      // The post gained a sixth finding and was renamed; the old slug is
+      // already indexed and linked to.
+      {
+        source: '/blog/five-guardrail-jailbreaks',
+        destination: '/blog/six-guardrail-jailbreaks',
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {
