@@ -27,11 +27,16 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   async redirects() {
     return [
-      // The post gained a sixth finding and was renamed; the old slug is
-      // already indexed and linked to.
+      // The post is renamed each time a finding validates, so every retired
+      // slug points at the current one — they are indexed and linked to.
       {
         source: '/blog/five-guardrail-jailbreaks',
-        destination: '/blog/six-guardrail-jailbreaks',
+        destination: '/blog/seven-guardrail-jailbreaks',
+        permanent: true,
+      },
+      {
+        source: '/blog/six-guardrail-jailbreaks',
+        destination: '/blog/seven-guardrail-jailbreaks',
         permanent: true,
       },
     ];
