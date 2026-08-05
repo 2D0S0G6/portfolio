@@ -5,9 +5,9 @@ export const honors: readonly Honor[] = [
   {
     title: 'Mozilla 0DIN Bug Bounty Program',
     org: 'Mozilla',
-    date: 'Mar 2026 — Jul 2026',
-    amount: '$3,500',
-    desc: 'Seven validated findings across production Large Language Model systems, each a multiple-model guardrail jailbreak that carried a restricted request inside the vocabulary of legitimate technical, scholarly or financial work. Disclosed responsibly with reproduction steps, proof-of-concept exploits, and remediation recommendations.',
+    date: 'Mar 2026 — Aug 2026',
+    amount: '$4,000',
+    desc: 'Eight validated findings across production Large Language Model systems, each a multiple-model guardrail jailbreak that carried a restricted request inside the vocabulary of legitimate technical, scholarly or financial work, or inside a mechanical reconstruction task. Disclosed responsibly with reproduction steps, proof-of-concept exploits, and remediation recommendations.',
   },
   {
     title: '3rd Prize — Vidyut National Level Multifest',
