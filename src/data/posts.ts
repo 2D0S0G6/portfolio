@@ -9,15 +9,15 @@ import type { Post } from '@/types';
 const featuredPosts: readonly Post[] = [
   {
     id: 'seven-guardrail-jailbreaks',
-    title: 'Seven guardrail jailbreaks, eighty-five tries',
+    title: 'Seven guardrail jailbreaks, seventy-four tries',
     date: '2026-07-28',
     read: '11 min',
     tags: ['jailbreaks', 'prompt-injection', 'llm-security', '0din'],
     excerpt:
       'An 8% hit rate on a GenAI bug bounty. All seven of my validated findings turned out to be the same idea wearing different clothes — and that was the actual result.',
     body: [
-      'Eighty-five submissions. Seven validated. That is an eight percent hit rate, and for a long time I found the number embarrassing enough not to say out loud.',
-      'I have come around on it. The seventy-eight rejections are where I actually learned to do this work, and almost none of what they taught me shows up in the write-ups people publish. So this is the honest version: what prompt injection really is, why the guardrail sitting in front of a model rarely saves it, and what the seven findings that landed had in common.',
+      'seventy-four submissions. Seven validated. That is an 9 percent hit rate, and for a long time I found the number embarrassing enough not to say out loud.',
+      'I have come around on it. The sixty-seven rejections are where I actually learned to do this work, and almost none of what they taught me shows up in the write-ups people publish. So this is the honest version: what prompt injection really is, why the guardrail sitting in front of a model rarely saves it, and what the seven findings that landed had in common.',
       'Start with the thing that makes this class of bug so stubborn. A language model receives one undifferentiated stream of text. Your system prompt, the user message, the contents of a document it was asked to summarise, the output of a tool it just called — by the time the model sees any of it, all of that has been flattened into the same context, in the same format, carrying the same authority. The model has no reliable way to tell you what came from the developer and what came from a stranger.',
       'People reach for the SQL injection analogy here, and it is a decent starting point, but it flatters our situation. SQL injection was solved by parameterised queries: a mechanism that puts code and data in genuinely separate channels, so a value can never be reinterpreted as an instruction. There is no equivalent for natural language. The instruction and the data are made of the same substance. We ask the model, politely, to keep them apart, and it usually does, and then sometimes it does not.',
       'The direct version is the one everyone has seen: a user types something adversarial straight into the box. The indirect version is where the real damage lives — the attacker never talks to the model at all. They leave the payload somewhere the model will eventually read, and the instructions arrive wearing the costume of data. Every retrieval and every tool call is another mouth through which untrusted text can enter the context.',
