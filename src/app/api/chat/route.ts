@@ -22,9 +22,14 @@ const RATE_LIMIT_MAX = 20;
 const hits = new Map<string, number[]>();
 
 const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
-const FALLBACK_MODEL = 'llama-3.1-8b-instant';
-const UPSTREAM_TIMEOUT_MS = 20_000;
+const CANDIDATE_MODELS = [
+  process.env.GROQ_MODEL,
+  'qwen/qwen3.8-27b',
+  'openai/gpt-oss-120b',
+  'llama-3.3-70b-versatile',
+  'llama-3.1-8b-instant',
+].filter(Boolean) as string[];
+const UPSTREAM_TIMEOUT_MS = 25_000;
 
 /** Cap the handler so a slow completion fails fast instead of hanging. */
 export const maxDuration = 30;
@@ -87,7 +92,10 @@ export async function POST(request: Request) {
   }
 
   // Strip wrapping quotes, trailing whitespace/carriage-returns, and accidental "Bearer " prefixes
-  const apiKey = rawKey.trim().replace(/^["']|["']$/g, '').replace(/^Bearer\s+/i, '');
+  const apiKey = rawKey
+    .trim()
+    .replace(/^["']|["']$/g, '')
+    .replace(/^Bearer\s+/i, '');
 
   if (!apiKey) {
     return NextResponse.json(
@@ -130,55 +138,60 @@ export async function POST(request: Request) {
   const signal = AbortSignal.any([request.signal, AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)]);
 
   try {
-    // Groq speaks the OpenAI chat-completions shape, so the system prompt is a
-    // leading message rather than a separate top-level field.
-    let upstream = await fetch(GROQ_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        max_tokens: mode === 'explain' ? 400 : 800,
-        temperature: 0.6,
-        messages: [{ role: 'system', content: SYSTEM_PROMPTS[mode] }, ...history],
-      }),
-      signal,
-    });
+    let text = '';
+    let lastError = '';
 
-    // If 70B hits rate limit (429) or temporary server error (503), fall back to 8B instant
-    if (!upstream.ok && (upstream.status === 429 || upstream.status === 503)) {
-      console.warn(`[api/chat] ${GROQ_MODEL} returned ${upstream.status}, trying fallback ${FALLBACK_MODEL}...`);
-      upstream = await fetch(GROQ_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: FALLBACK_MODEL,
-          max_tokens: mode === 'explain' ? 400 : 800,
-          temperature: 0.6,
-          messages: [{ role: 'system', content: SYSTEM_PROMPTS[mode] }, ...history],
-        }),
-        signal,
-      });
+    for (const model of CANDIDATE_MODELS) {
+      try {
+        const upstream = await fetch(GROQ_ENDPOINT, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            model,
+            max_tokens: mode === 'explain' ? 400 : 800,
+            temperature: 0.6,
+            messages: [{ role: 'system', content: SYSTEM_PROMPTS[mode] }, ...history],
+          }),
+          signal,
+        });
+
+        if (!upstream.ok) {
+          const errBody = await upstream.text().catch(() => '');
+          lastError = `status ${upstream.status}: ${errBody}`;
+          console.warn(
+            `[api/chat] model ${model} failed (${upstream.status}), trying next candidate. Error:`,
+            errBody,
+          );
+          // If 401 Unauthorized (bad API key), trying other models won't help
+          if (upstream.status === 401) {
+            break;
+          }
+          continue;
+        }
+
+        const payload = (await upstream.json()) as {
+          choices?: { message?: { content?: string }; finish_reason?: string }[];
+        };
+
+        const reply = payload.choices?.[0]?.message?.content?.trim() ?? '';
+        if (reply) {
+          text = reply;
+          break;
+        } else {
+          console.warn(`[api/chat] model ${model} returned empty content, trying next candidate...`);
+        }
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : String(err);
+        console.warn(`[api/chat] error calling model ${model}:`, lastError);
+      }
     }
 
-    if (!upstream.ok) {
-      const errBody = await upstream.text().catch(() => '');
-      console.error('[api/chat] upstream error status:', upstream.status, errBody);
-      return NextResponse.json({ error: 'The assistant is unavailable right now.' }, { status: 502 });
-    }
-
-    const payload = (await upstream.json()) as {
-      choices?: { message?: { content?: string }; finish_reason?: string }[];
-    };
-
-    const text = payload.choices?.[0]?.message?.content?.trim() ?? '';
     if (!text) {
-      return NextResponse.json({ error: 'The assistant returned an empty reply.' }, { status: 502 });
+      console.error('[api/chat] all candidate models failed. Last error:', lastError);
+      return NextResponse.json({ error: 'The assistant is unavailable right now.' }, { status: 502 });
     }
 
     return NextResponse.json({ text });
