@@ -31,17 +31,22 @@ const nextConfig: NextConfig = {
       // slug points at the current one — they are indexed and linked to.
       {
         source: '/blog/five-guardrail-jailbreaks',
-        destination: '/blog/eight-guardrail-jailbreaks',
+        destination: '/blog/ten-guardrail-jailbreaks',
         permanent: true,
       },
       {
         source: '/blog/six-guardrail-jailbreaks',
-        destination: '/blog/eight-guardrail-jailbreaks',
+        destination: '/blog/ten-guardrail-jailbreaks',
         permanent: true,
       },
       {
         source: '/blog/seven-guardrail-jailbreaks',
-        destination: '/blog/eight-guardrail-jailbreaks',
+        destination: '/blog/ten-guardrail-jailbreaks',
+        permanent: true,
+      },
+      {
+        source: '/blog/eight-guardrail-jailbreaks',
+        destination: '/blog/ten-guardrail-jailbreaks',
         permanent: true,
       },
     ];

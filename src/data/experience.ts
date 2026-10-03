@@ -2,14 +2,25 @@ import type { ExperienceEntry } from '@/types';
 
 export const experience: readonly ExperienceEntry[] = [
   {
+    role: 'Information Security Intern',
+    org: 'Angel One',
+    period: 'Sep 2026 — Present',
+    where: 'Bengaluru',
+    desc: 'Working on AI security engineering, shadow AI governance, and securing enterprise GenAI workflows.',
+    points: [
+      'Engineering security controls and monitoring for AI workloads and shadow AI detection',
+      'Assessing vulnerabilities, guardrails, and threat models across LLM integrations',
+    ],
+  },
+  {
     role: 'Security Research Intern',
     org: 'Amrita Center for Cybersecurity Systems & Networks',
-    period: 'Jun 2026 — Present',
+    period: 'Jun 2026 — Sep 2026',
     where: 'Amritapuri',
-    desc: 'Working on IoT security and behavioural authentication — how a device or user can be verified continuously, not just once at connection time.',
+    desc: 'Worked on IoT security and behavioural authentication — how a device or user can be verified continuously, not just once at connection time.',
     points: [
       'Built TrustMQTT, a framework for continuous identity verification in MQTT environments',
-      'Researching behavioural authentication approaches for IoT deployments',
+      'Researched behavioural authentication approaches for IoT deployments',
     ],
   },
   {

@@ -4,7 +4,7 @@ import type { Education } from '@/types';
 export const bio: readonly string[] = [
   "Hi — I'm Deepak. I'm a cybersecurity researcher and engineer working at the intersection of AI, cryptography, and practical engineering, currently pursuing a B.Tech in Computer Science & Engineering (Cyber Security) at Amrita Vishwa Vidyapeetham.",
   'My work spans vulnerability research, AI security, IoT security engineering, and secure software development. What I care about most is building practical systems that connect applied research to real-world security problems — a scanner someone can actually run in CI, a detector that holds up against adversarial input.',
-  "Right now I'm researching behavioural authentication for IoT at the Amrita Center for Cybersecurity Systems & Networks, publishing on prompt-injection detection and biometric spoof detection, and exploring where machine learning and cybersecurity meet.",
+  "Right now I'm an Information Security Intern at Angel One working on AI security engineering, shadow AI, and LLM security, having completed research in IoT behavioural authentication at Amrita CSN, while continuing research in adversarial machine learning and practical AI defense.",
 ];
 
 export const education: Education = {
