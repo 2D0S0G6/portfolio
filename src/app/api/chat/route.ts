@@ -23,6 +23,7 @@ const hits = new Map<string, number[]>();
 
 const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const FALLBACK_MODEL = 'llama-3.1-8b-instant';
 const UPSTREAM_TIMEOUT_MS = 20_000;
 
 /** Cap the handler so a slow completion fails fast instead of hanging. */
@@ -75,9 +76,19 @@ function withinRateLimit(key: string): boolean {
 }
 
 export async function POST(request: Request) {
-  const apiKey = process.env.GROQ_API_KEY;
+  const rawKey = process.env.GROQ_API_KEY;
 
   // The site is fully functional without a key — the assistant just says so.
+  if (!rawKey) {
+    return NextResponse.json(
+      { error: 'The assistant is not configured on this deployment.' },
+      { status: 503 },
+    );
+  }
+
+  // Strip wrapping quotes, trailing whitespace/carriage-returns, and accidental "Bearer " prefixes
+  const apiKey = rawKey.trim().replace(/^["']|["']$/g, '').replace(/^Bearer\s+/i, '');
+
   if (!apiKey) {
     return NextResponse.json(
       { error: 'The assistant is not configured on this deployment.' },
@@ -121,7 +132,7 @@ export async function POST(request: Request) {
   try {
     // Groq speaks the OpenAI chat-completions shape, so the system prompt is a
     // leading message rather than a separate top-level field.
-    const upstream = await fetch(GROQ_ENDPOINT, {
+    let upstream = await fetch(GROQ_ENDPOINT, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -136,9 +147,28 @@ export async function POST(request: Request) {
       signal,
     });
 
+    // If 70B hits rate limit (429) or temporary server error (503), fall back to 8B instant
+    if (!upstream.ok && (upstream.status === 429 || upstream.status === 503)) {
+      console.warn(`[api/chat] ${GROQ_MODEL} returned ${upstream.status}, trying fallback ${FALLBACK_MODEL}...`);
+      upstream = await fetch(GROQ_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: FALLBACK_MODEL,
+          max_tokens: mode === 'explain' ? 400 : 800,
+          temperature: 0.6,
+          messages: [{ role: 'system', content: SYSTEM_PROMPTS[mode] }, ...history],
+        }),
+        signal,
+      });
+    }
+
     if (!upstream.ok) {
-      // Log the status only — the body can echo back request content.
-      console.error('[api/chat] upstream', upstream.status);
+      const errBody = await upstream.text().catch(() => '');
+      console.error('[api/chat] upstream error status:', upstream.status, errBody);
       return NextResponse.json({ error: 'The assistant is unavailable right now.' }, { status: 502 });
     }
 
@@ -153,7 +183,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ text });
   } catch (error) {
-    console.error('[api/chat]', error);
+    console.error('[api/chat] error:', error);
     return NextResponse.json({ error: 'The assistant is unavailable right now.' }, { status: 502 });
   }
 }
