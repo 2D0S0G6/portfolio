@@ -7,7 +7,7 @@ export const site = {
   /** Short mono initials shown in the navbar. */
   initials: 'DSG',
   role: 'Security Researcher · AI & IoT Security',
-  tagline: 'Building security solutions at the intersection of AI, cryptography, and practical engineering.',
+  tagline: 'Building security solutions at the intersection of AI, cloud security, and practical engineering.',
   description:
     'Portfolio of Deepak S G — cybersecurity researcher and engineer working on AI security, IoT security, and vulnerability research.',
   /** Used for canonical URLs and Open Graph. Override with NEXT_PUBLIC_SITE_URL. */
