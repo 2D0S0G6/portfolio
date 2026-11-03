@@ -6,10 +6,10 @@ export const experience: readonly ExperienceEntry[] = [
     org: 'Angel One',
     period: 'Sep 2026 — Present',
     where: 'Bengaluru',
-    desc: 'Working on AI security engineering, shadow AI governance, and securing enterprise GenAI workflows.',
+    desc: 'Working on cloud security posture assessment across AWS and AI security engineering for production systems.',
     points: [
-      'Engineering security controls and monitoring for AI workloads and shadow AI detection',
-      'Assessing vulnerabilities, guardrails, and threat models across LLM integrations',
+      'Cloud security: Assess AWS cloud security posture and review service configurations; identify misconfigurations using CrowdStrike Falcon and recommend hardening controls to reduce attack surface.',
+      'AI security: Working on Shadow AI usage discovery and insider-policy gaps, and apply secure-by-design principles to AI-enabled production systems.',
     ],
   },
   {
